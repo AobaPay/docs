@@ -1,0 +1,52 @@
+---
+title: "Paginação e sincronização"
+description: "Como navegar por resultados paginados e sincronizar apenas o que mudou com delta sync."
+icon: "arrows-rotate"
+---
+
+## Paginação
+
+Endpoints de listagem são paginados (25 itens para pedidos e produtos, 50 para estoque)
+e seguem o padrão Laravel:
+
+```json
+{
+  "data": [ ... ],
+  "links": { "first": "...", "last": "...", "prev": null, "next": "..." },
+  "meta": { "current_page": 1, "last_page": 4, "per_page": 25, "total": 87 }
+}
+```
+
+Navegue com o parâmetro `?page=2` ou seguindo `links.next`.
+
+## Sincronização incremental (delta sync)
+
+Os endpoints `GET /pedidos`, `GET /produtos` e `GET /estoque` aceitam o parâmetro
+`atualizado_apos` (data/hora ISO 8601) para buscar **apenas o que mudou** desde a
+última sincronização:
+
+```bash
+curl "https://akeba.com.br/api/v1/produtos?atualizado_apos=2026-07-01T00:00:00Z" \
+  -H "Authorization: Bearer SEU_TOKEN"
+```
+
+Quando `atualizado_apos` está presente, os resultados são ordenados por
+`updated_at asc, id asc` — ordem estável, ideal para consumo incremental.
+
+<Steps>
+  <Step title="Primeira carga">
+    Liste tudo sem `atualizado_apos`, percorrendo todas as páginas.
+  </Step>
+  <Step title="Guarde o cursor">
+    Salve o maior `updated_at` recebido (ou o horário de início da sincronização).
+  </Step>
+  <Step title="Sincronizações seguintes">
+    Envie `atualizado_apos=<cursor salvo>` para receber apenas registros criados
+    ou alterados desde então.
+  </Step>
+</Steps>
+
+<Tip>
+  Combine o delta sync com [webhooks](/guias/webhooks) para manter seu sistema
+  atualizado em tempo real com o mínimo de chamadas à API.
+</Tip>

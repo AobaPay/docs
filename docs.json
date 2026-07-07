@@ -1,53 +1,93 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mintlify Starter Kit",
+  "name": "Akeba",
+  "description": "Documentação da API da Akeba — marketplace de produtos criativos e artesanais feitos por criadores independentes do Brasil.",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#F57754",
+    "light": "#F89B82",
+    "dark": "#D95F3D"
+  },
+  "appearance": {
+    "default": "light",
+    "strict": true
+  },
+  "background": {
+    "color": {
+      "light": "#FCF8ED"
+    }
+  },
+  "fonts": {
+    "heading": {
+      "family": "Bricolage Grotesque"
+    },
+    "body": {
+      "family": "Montserrat"
+    }
   },
   "favicon": "/favicon.svg",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/light.svg"
+  },
   "navigation": {
-    "pages": [
+    "tabs": [
       {
-        "group": "Getting Started",
-        "pages": [
-          "index",
-          "quickstart"
+        "tab": "Documentação",
+        "groups": [
+          {
+            "group": "Início",
+            "pages": [
+              "index",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Guias",
+            "pages": [
+              "guias/autenticacao",
+              "guias/paginacao-e-sincronizacao",
+              "guias/fluxo-de-pedidos",
+              "guias/webhooks",
+              "guias/erros"
+            ]
+          }
         ]
+      },
+      {
+        "tab": "Referência da API",
+        "openapi": {
+          "source": "/openapi.json",
+          "directory": "api-reference"
+        }
       }
     ],
     "global": {
       "anchors": [
         {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
+          "anchor": "Site da Akeba",
+          "href": "https://www.akeba.com.br",
+          "icon": "globe"
         },
         {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
+          "anchor": "Painel do vendedor",
+          "href": "https://akeba.com.br/vendedor/integracoes",
+          "icon": "key"
         }
       ]
     }
   },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
   "navbar": {
     "links": [
       {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "label": "Suporte",
+        "href": "https://www.akeba.com.br"
       }
     ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://app.mintlify.com"
+      "label": "Painel do vendedor",
+      "href": "https://akeba.com.br/vendedor/integracoes"
     }
   },
   "contextual": {
@@ -64,9 +104,8 @@
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "instagram": "https://www.instagram.com/akebabr/",
+      "website": "https://www.akeba.com.br"
     }
   }
 }

@@ -5,3 +5,6 @@
 # Draft content
 drafts/
 *.draft.mdx
+
+# Rascunho original usado como base para as páginas em guias/
+docs.mdx

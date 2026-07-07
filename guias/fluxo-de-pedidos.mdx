@@ -1,0 +1,75 @@
+---
+title: "Fluxo de pedidos"
+description: "O ciclo de vida de um item de pedido: do pagamento à entrega."
+icon: "truck"
+---
+
+## Ciclo de vida de um item
+
+Após o pagamento ser confirmado, cada item de pedido percorre o ciclo:
+
+```text
+pending → accepted → in_production → shipped → delivered
+```
+
+| Ação | Endpoint | Transição |
+| --- | --- | --- |
+| Aceitar item | `POST /pedidos/{pedidoId}/itens/{itemId}/aceitar` | `pending → accepted` |
+| Iniciar produção | `POST /pedidos/{pedidoId}/itens/{itemId}/iniciar-producao` | `accepted → in_production` |
+| Enviar (com rastreio) | `POST /pedidos/{pedidoId}/itens/{itemId}/enviar` | `in_production → shipped` |
+| Voltar para produção | `POST /pedidos/{pedidoId}/itens/{itemId}/voltar-producao` | `shipped → in_production` |
+
+Transições inválidas retornam `422` com uma mensagem descritiva.
+
+## Exemplo completo
+
+<Steps>
+  <Step title="Liste os itens pendentes">
+    ```bash
+    curl "https://akeba.com.br/api/v1/pedidos?status=pending" \
+      -H "Authorization: Bearer SEU_TOKEN"
+    ```
+  </Step>
+  <Step title="Aceite o item">
+    ```bash
+    curl -X POST \
+      "https://akeba.com.br/api/v1/pedidos/{pedidoId}/itens/{itemId}/aceitar" \
+      -H "Authorization: Bearer SEU_TOKEN"
+    ```
+  </Step>
+  <Step title="Inicie a produção">
+    ```bash
+    curl -X POST \
+      "https://akeba.com.br/api/v1/pedidos/{pedidoId}/itens/{itemId}/iniciar-producao" \
+      -H "Authorization: Bearer SEU_TOKEN"
+    ```
+  </Step>
+  <Step title="Envie com código de rastreio">
+    ```bash
+    curl -X POST \
+      "https://akeba.com.br/api/v1/pedidos/{pedidoId}/itens/{itemId}/enviar" \
+      -H "Authorization: Bearer SEU_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{ "tracking_code": "AA123456789BR" }'
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  Enviou por engano? Use `POST .../voltar-producao` para reverter um item
+  `shipped` de volta para `in_production` e corrigir o envio.
+</Note>
+
+## Filtros disponíveis
+
+O endpoint `GET /pedidos` aceita os filtros:
+
+| Parâmetro | Formato | Descrição |
+| --- | --- | --- |
+| `status` | enum | `pending`, `accepted`, `in_production`, `shipped`, `delivered`, `cancelled` |
+| `data_inicio` | `YYYY-MM-DD` | Pedidos criados a partir desta data |
+| `data_fim` | `YYYY-MM-DD` | Pedidos criados até esta data |
+| `atualizado_apos` | ISO 8601 | Apenas itens alterados após esta data/hora ([delta sync](/guias/paginacao-e-sincronizacao)) |
+
+Para os detalhes completos de cada endpoint — incluindo os schemas de resposta —
+consulte a aba **Referência da API**.

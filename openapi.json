@@ -1,0 +1,1838 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Akeba",
+    "version": "1.0.0",
+    "description": "API REST da Akeba para integração com ERPs. Permite consultar pedidos, atualizar o status de entrega dos itens (aceitar, iniciar produção, enviar com código de rastreio, voltar para produção), gerenciar preços e estoque. Autentique com o token gerado em /vendedor/integracoes enviando o header Authorization: Bearer <token>. Eventos de webhook: \"pedido.pago\", \"item.status_alterado\", \"pedido.cancelado\". Assinatura de webhook: X-Akeba-Signature: sha256=HMAC-SHA256(corpo, segredo)."
+  },
+  "servers": [
+    {
+      "url": "https://akeba.com.br/api/v1",
+      "description": "Produção"
+    }
+  ],
+  "security": [
+    {
+      "http": []
+    }
+  ],
+  "paths": {
+    "/ping": {
+      "get": {
+        "operationId": "v1.ping",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pong": {
+                      "type": "boolean"
+                    },
+                    "loja_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "pong",
+                    "loja_id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          }
+        }
+      }
+    },
+    "/estoque": {
+      "get": {
+        "operationId": "v1.estoque.index",
+        "description": "Retorna uma lista paginada de 50 variações com suas quantidades em estoque.\nInclui informações do produto associado.",
+        "summary": "Lista o estoque de todas as variações da loja",
+        "tags": [
+          "Estoque"
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "atualizado_apos",
+            "in": "query",
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated set of `EstoqueResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EstoqueResource"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "properties": {
+                        "first": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "last": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "prev": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "next": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "first",
+                        "last",
+                        "prev",
+                        "next"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "current_page": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "from": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "minimum": 1
+                        },
+                        "last_page": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "links": {
+                          "type": "array",
+                          "description": "Generated paginator links.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "active": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "url",
+                              "label",
+                              "active"
+                            ]
+                          }
+                        },
+                        "path": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Base path for paginator generated URLs."
+                        },
+                        "per_page": {
+                          "type": "integer",
+                          "description": "Number of items shown per page.",
+                          "minimum": 0
+                        },
+                        "to": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": "Number of the last item in the slice.",
+                          "minimum": 1
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Total number of items being paginated.",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "current_page",
+                        "from",
+                        "last_page",
+                        "links",
+                        "path",
+                        "per_page",
+                        "to",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "links",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          }
+        }
+      }
+    },
+    "/estoque/{stockId}": {
+      "patch": {
+        "operationId": "v1.estoque.update",
+        "description": "Atualiza a quantidade em estoque (quantidade, integer) e/ou status de atividade (is_active, boolean).\nAmbos os campos são opcionais mas ao menos um deve ser fornecido.\nPara produtos sem variações que rastreiam estoque, sincroniza automaticamente o estoque global.",
+        "summary": "Atualiza o estoque de uma variação de produto",
+        "tags": [
+          "Estoque"
+        ],
+        "parameters": [
+          {
+            "name": "stockId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtualizarEstoqueRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`EstoqueResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/EstoqueResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      }
+    },
+    "/pedidos": {
+      "get": {
+        "operationId": "v1.pedidos.index",
+        "description": "Retorna uma lista paginada de 25 itens de pedido com suporte a filtros por status e data.\nStatus válidos: 'pending', 'accepted', 'in_production', 'shipped', 'delivered', 'cancelled'.\nDatas devem estar no formato YYYY-MM-DD.",
+        "summary": "Lista os itens de pedido da loja",
+        "tags": [
+          "Pedido"
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "pending",
+                "accepted",
+                "in_production",
+                "shipped",
+                "delivered",
+                "cancelled"
+              ]
+            }
+          },
+          {
+            "name": "data_inicio",
+            "in": "query",
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date"
+            }
+          },
+          {
+            "name": "data_fim",
+            "in": "query",
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date"
+            }
+          },
+          {
+            "name": "atualizado_apos",
+            "in": "query",
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated set of `PedidoItemResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PedidoItemResource"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "properties": {
+                        "first": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "last": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "prev": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "next": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "first",
+                        "last",
+                        "prev",
+                        "next"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "current_page": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "from": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "minimum": 1
+                        },
+                        "last_page": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "links": {
+                          "type": "array",
+                          "description": "Generated paginator links.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "active": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "url",
+                              "label",
+                              "active"
+                            ]
+                          }
+                        },
+                        "path": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Base path for paginator generated URLs."
+                        },
+                        "per_page": {
+                          "type": "integer",
+                          "description": "Number of items shown per page.",
+                          "minimum": 0
+                        },
+                        "to": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": "Number of the last item in the slice.",
+                          "minimum": 1
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Total number of items being paginated.",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "current_page",
+                        "from",
+                        "last_page",
+                        "links",
+                        "path",
+                        "per_page",
+                        "to",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "links",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          }
+        }
+      }
+    },
+    "/pedidos/{pedidoId}": {
+      "get": {
+        "operationId": "v1.pedidos.show",
+        "description": "Retorna os detalhes completos de um pedido incluindo todos os seus itens e endereço de entrega.\nApenas itens pertencentes à loja autenticada são incluídos.",
+        "summary": "Obtém detalhes de um pedido",
+        "tags": [
+          "Pedido"
+        ],
+        "parameters": [
+          {
+            "name": "pedidoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`PedidoResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PedidoResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/ModelNotFoundException"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          }
+        }
+      }
+    },
+    "/pedidos/{pedidoId}/itens/{itemId}/aceitar": {
+      "post": {
+        "operationId": "v1.pedidos.itens.aceitar",
+        "description": "Marca um item como aceito pela loja. Só é permitido quando o pedido está pago e o item está no status 'pendente'.\nTransição de status: pendente → aceito. Retorna o item atualizado ou erro 400 se a transição não for permitida.",
+        "summary": "Aceita um item de pedido",
+        "tags": [
+          "Pedido"
+        ],
+        "parameters": [
+          {
+            "name": "pedidoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`PedidoItemResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PedidoItemResource"
+                        }
+                      },
+                      "required": [
+                        "data"
+                      ]
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          }
+        }
+      }
+    },
+    "/pedidos/{pedidoId}/itens/{itemId}/iniciar-producao": {
+      "post": {
+        "operationId": "v1.pedidos.itens.iniciarProducao",
+        "description": "Marca um item como em produção. Só é permitido quando o item está no status 'aceito'.\nTransição de status: aceito → em_producao. Retorna o item atualizado ou erro 400 se a transição não for permitida.",
+        "summary": "Inicia a produção de um item de pedido",
+        "tags": [
+          "Pedido"
+        ],
+        "parameters": [
+          {
+            "name": "pedidoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`PedidoItemResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PedidoItemResource"
+                        }
+                      },
+                      "required": [
+                        "data"
+                      ]
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          }
+        }
+      }
+    },
+    "/pedidos/{pedidoId}/itens/{itemId}/enviar": {
+      "post": {
+        "operationId": "v1.pedidos.itens.enviar",
+        "description": "Marca um item como enviado e registra o código de rastreamento. Só é permitido quando o item está no status 'em_producao'.\nRequer campo 'tracking_code' (string, até 100 caracteres). Transição de status: em_producao → enviado.\nRetorna o item atualizado ou erro 400 se a transição não for permitida.",
+        "summary": "Marca um item como enviado com código de rastreio",
+        "tags": [
+          "Pedido"
+        ],
+        "parameters": [
+          {
+            "name": "pedidoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnviarItemRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`PedidoItemResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PedidoItemResource"
+                        }
+                      },
+                      "required": [
+                        "data"
+                      ]
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      }
+    },
+    "/pedidos/{pedidoId}/itens/{itemId}/voltar-producao": {
+      "post": {
+        "operationId": "v1.pedidos.itens.voltarProducao",
+        "description": "Reverte um item enviado de volta para o status de produção (e.g., em caso de erro de envio).\nSó é permitido quando o item está no status 'enviado'.\nTransição de status: enviado → em_producao. Retorna o item atualizado ou erro 400 se a transição não for permitida.",
+        "summary": "Volta um item para produção",
+        "tags": [
+          "Pedido"
+        ],
+        "parameters": [
+          {
+            "name": "pedidoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`PedidoItemResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PedidoItemResource"
+                        }
+                      },
+                      "required": [
+                        "data"
+                      ]
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          }
+        }
+      }
+    },
+    "/produtos": {
+      "get": {
+        "operationId": "v1.produtos.index",
+        "description": "Retorna uma lista paginada de 25 produtos com resumo de informações.\nSuporta filtro por status. Status válidos: 'ativo', 'inativo', 'deletado'.",
+        "summary": "Lista os produtos da loja",
+        "tags": [
+          "Produto"
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "draft",
+                "active",
+                "paused",
+                "rejected"
+              ]
+            }
+          },
+          {
+            "name": "atualizado_apos",
+            "in": "query",
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated set of `ProdutoResumoResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProdutoResumoResource"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "properties": {
+                        "first": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "last": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "prev": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "next": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "first",
+                        "last",
+                        "prev",
+                        "next"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "current_page": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "from": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "minimum": 1
+                        },
+                        "last_page": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "links": {
+                          "type": "array",
+                          "description": "Generated paginator links.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "active": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "url",
+                              "label",
+                              "active"
+                            ]
+                          }
+                        },
+                        "path": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Base path for paginator generated URLs."
+                        },
+                        "per_page": {
+                          "type": "integer",
+                          "description": "Number of items shown per page.",
+                          "minimum": 0
+                        },
+                        "to": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": "Number of the last item in the slice.",
+                          "minimum": 1
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Total number of items being paginated.",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "current_page",
+                        "from",
+                        "last_page",
+                        "links",
+                        "path",
+                        "per_page",
+                        "to",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "links",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          }
+        }
+      }
+    },
+    "/produtos/{produtoId}": {
+      "get": {
+        "operationId": "v1.produtos.show",
+        "description": "Retorna informações detalhadas do produto, incluindo todas as variações de estoque,\nimagem de capa, galeria de imagens e categoria com categoria pai.",
+        "summary": "Obtém detalhes completos de um produto",
+        "tags": [
+          "Produto"
+        ],
+        "parameters": [
+          {
+            "name": "produtoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`ProdutoResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ProdutoResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          }
+        }
+      }
+    },
+    "/produtos/{produtoId}/preco": {
+      "patch": {
+        "operationId": "v1.produtos.preco",
+        "description": "Atualiza o preço base (preco) e/ou preço promocional (preco_promocional) de um produto.\nAmbos os campos são opcionais mas ao menos um deve ser fornecido. Valores em centavos (integer).",
+        "summary": "Atualiza o preço de um produto",
+        "tags": [
+          "Produto"
+        ],
+        "parameters": [
+          {
+            "name": "produtoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtualizarPrecoRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`ProdutoResource`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ProdutoResource"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationException"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationException"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "http": {
+        "type": "http",
+        "description": "Token de API gerado em /vendedor/integracoes.",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "AtualizarEstoqueRequest": {
+        "type": "object",
+        "properties": {
+          "quantidade": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "is_active": {
+            "type": "boolean"
+          }
+        },
+        "title": "AtualizarEstoqueRequest"
+      },
+      "AtualizarPrecoRequest": {
+        "type": "object",
+        "properties": {
+          "preco": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "preco_promocional": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0.01
+          }
+        },
+        "title": "AtualizarPrecoRequest"
+      },
+      "EnviarItemRequest": {
+        "type": "object",
+        "properties": {
+          "tracking_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          }
+        },
+        "title": "EnviarItemRequest"
+      },
+      "EstoqueResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "variation_options": {
+            "type": "string"
+          },
+          "quantidade": {
+            "type": "string"
+          },
+          "is_active": {
+            "type": "string"
+          },
+          "produto": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "nome": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "nome"
+            ]
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "product_id",
+          "sku",
+          "variation_options",
+          "quantidade",
+          "is_active",
+          "updated_at"
+        ],
+        "title": "EstoqueResource"
+      },
+      "PedidoItemResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "order_id": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "product_nome": {
+            "type": "string"
+          },
+          "preco_unitario": {
+            "type": "string"
+          },
+          "quantidade": {
+            "type": "string"
+          },
+          "subtotal": {
+            "type": "string"
+          },
+          "frete_valor": {
+            "type": "string"
+          },
+          "item_status": {
+            "type": "string"
+          },
+          "tracking_code": {
+            "type": "string"
+          },
+          "cancellation_reason": {
+            "type": "string"
+          },
+          "variation_options": {
+            "type": "string"
+          },
+          "personalization_data": {
+            "type": "string"
+          },
+          "delivery_type": {
+            "type": "string"
+          },
+          "label_url": {
+            "type": "string"
+          },
+          "superfrete_status": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "aceito_em": {
+            "type": "string"
+          },
+          "em_producao_em": {
+            "type": "string"
+          },
+          "enviado_em": {
+            "type": "string"
+          },
+          "entregue_em": {
+            "type": "string"
+          },
+          "cancelado_em": {
+            "type": "string"
+          },
+          "financeiro": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "valor_liquido_vendedor": {
+                "type": "string"
+              },
+              "comissao_pct": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "valor_comissao": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": "string"
+              },
+              "data_credito": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "valor_liquido_vendedor",
+              "comissao_pct",
+              "valor_comissao",
+              "status",
+              "data_credito"
+            ]
+          },
+          "pedido": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "numero": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "metodo_envio": {
+                "type": "string"
+              },
+              "created_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "numero",
+              "status",
+              "metodo_envio",
+              "created_at"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "order_id",
+          "product_id",
+          "product_nome",
+          "preco_unitario",
+          "quantidade",
+          "subtotal",
+          "frete_valor",
+          "item_status",
+          "tracking_code",
+          "cancellation_reason",
+          "variation_options",
+          "personalization_data",
+          "delivery_type",
+          "label_url",
+          "superfrete_status",
+          "created_at",
+          "updated_at",
+          "aceito_em",
+          "em_producao_em",
+          "enviado_em",
+          "entregue_em",
+          "cancelado_em"
+        ],
+        "title": "PedidoItemResource"
+      },
+      "PedidoResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "numero": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "subtotal": {
+            "type": "string"
+          },
+          "desconto": {
+            "type": "string"
+          },
+          "frete_total": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          },
+          "metodo_envio": {
+            "type": "string"
+          },
+          "frete_prazo": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "comprador": {
+            "type": "object",
+            "properties": {
+              "nome": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "telefone": {
+                "type": "string"
+              },
+              "cpf_cnpj": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "nome",
+              "email",
+              "telefone",
+              "cpf_cnpj"
+            ]
+          },
+          "pagamento": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "metodo": {
+                "type": "string",
+                "description": "updated_at captures when the gateway webhook changed status to paid/approved"
+              },
+              "pago_em": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "metodo",
+              "pago_em"
+            ]
+          },
+          "endereco_entrega": {
+            "type": "object",
+            "properties": {
+              "nome_destinatario": {
+                "type": "string"
+              },
+              "cep": {
+                "type": "string"
+              },
+              "logradouro": {
+                "type": "string"
+              },
+              "numero": {
+                "type": "string"
+              },
+              "complemento": {
+                "type": "string"
+              },
+              "bairro": {
+                "type": "string"
+              },
+              "cidade": {
+                "type": "string"
+              },
+              "estado": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "nome_destinatario",
+              "cep",
+              "logradouro",
+              "numero",
+              "complemento",
+              "bairro",
+              "cidade",
+              "estado"
+            ]
+          },
+          "itens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PedidoItemResource"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "numero",
+          "status",
+          "subtotal",
+          "desconto",
+          "frete_total",
+          "total",
+          "metodo_envio",
+          "frete_prazo",
+          "notes",
+          "created_at",
+          "itens"
+        ],
+        "title": "PedidoResource"
+      },
+      "ProdutoResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "preco": {
+            "type": "number"
+          },
+          "preco_promocional": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "estoque_global": {
+            "type": "string"
+          },
+          "has_variations": {
+            "type": "string"
+          },
+          "capa": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "url": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "url_medium": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "url_thumb": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "url",
+              "url_medium",
+              "url_thumb"
+            ]
+          },
+          "imagens": {
+            "type": "string"
+          },
+          "categoria": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "nome": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "categoria_pai": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "nome": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "nome",
+                  "slug"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "nome",
+              "slug",
+              "categoria_pai"
+            ]
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 0,
+                "maxItems": 0,
+                "additionalItems": false
+              }
+            ]
+          },
+          "descricao": {
+            "type": "string"
+          },
+          "delivery_type": {
+            "type": "string"
+          },
+          "track_stock": {
+            "type": "string"
+          },
+          "plano": {
+            "type": "string"
+          },
+          "peso": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "altura": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "largura": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "comprimento": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "video_url": {
+            "type": "string"
+          },
+          "estoques": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EstoqueResource"
+            }
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nome",
+          "slug",
+          "preco",
+          "preco_promocional",
+          "status",
+          "estoque_global",
+          "has_variations",
+          "tags",
+          "descricao",
+          "delivery_type",
+          "track_stock",
+          "plano",
+          "peso",
+          "altura",
+          "largura",
+          "comprimento",
+          "video_url",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ProdutoResource"
+      },
+      "ProdutoResumoResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "preco": {
+            "type": "number"
+          },
+          "preco_promocional": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "estoque_global": {
+            "type": "string"
+          },
+          "has_variations": {
+            "type": "string"
+          },
+          "categoria_id": {
+            "type": "string"
+          },
+          "capa": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "url": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "url_medium": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "url_thumb": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "url",
+              "url_medium",
+              "url_thumb"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nome",
+          "slug",
+          "preco",
+          "preco_promocional",
+          "status",
+          "estoque_global",
+          "has_variations",
+          "categoria_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ProdutoResumoResource"
+      }
+    },
+    "responses": {
+      "AuthenticationException": {
+        "description": "Unauthenticated",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "Error overview."
+                }
+              },
+              "required": [
+                "message"
+              ]
+            }
+          }
+        }
+      },
+      "ValidationException": {
+        "description": "Validation error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "Errors overview."
+                },
+                "errors": {
+                  "type": "object",
+                  "description": "A detailed description of each field that failed validation.",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "required": [
+                "message",
+                "errors"
+              ]
+            }
+          }
+        }
+      },
+      "ModelNotFoundException": {
+        "description": "Not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "Error overview."
+                }
+              },
+              "required": [
+                "message"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,78 @@
+---
+title: "Webhooks"
+description: "Receba eventos em tempo real: pedidos pagos, mudanças de status e cancelamentos."
+icon: "bolt"
+---
+
+Cadastre endpoints de webhook no [painel de integrações](https://akeba.com.br/vendedor/integracoes)
+para receber eventos em tempo real:
+
+| Evento | Disparado quando |
+| --- | --- |
+| `pedido.pago` | Um pedido com itens da sua loja é pago |
+| `item.status_alterado` | O status de um item de pedido muda |
+| `pedido.cancelado` | Um pedido é cancelado |
+
+## Headers de entrega
+
+Cada entrega inclui os headers:
+
+| Header | Descrição |
+| --- | --- |
+| `X-Akeba-Event` | Nome do evento (ex.: `pedido.pago`) |
+| `X-Akeba-Delivery-Id` | UUID único da entrega (use para deduplicação) |
+| `X-Akeba-Signature` | Assinatura HMAC do corpo: `sha256=HMAC-SHA256(corpo, segredo)` |
+
+## Validando a assinatura
+
+Sempre valide a assinatura antes de processar o payload:
+
+<CodeGroup>
+
+```php PHP
+$assinaturaEsperada = 'sha256='.hash_hmac('sha256', $corpoRaw, $segredo);
+
+if (! hash_equals($assinaturaEsperada, $request->header('X-Akeba-Signature'))) {
+    abort(401);
+}
+```
+
+```javascript Node.js
+const crypto = require("crypto");
+
+const esperada =
+  "sha256=" + crypto.createHmac("sha256", segredo).update(corpoRaw).digest("hex");
+
+const valida = crypto.timingSafeEqual(
+  Buffer.from(esperada),
+  Buffer.from(req.headers["x-akeba-signature"])
+);
+```
+
+```python Python
+import hashlib, hmac
+
+esperada = "sha256=" + hmac.new(
+    segredo.encode(), corpo_raw, hashlib.sha256
+).hexdigest()
+
+valida = hmac.compare_digest(esperada, request.headers["X-Akeba-Signature"])
+```
+
+</CodeGroup>
+
+<Warning>
+  Use sempre comparação em tempo constante (`hash_equals`, `timingSafeEqual`,
+  `compare_digest`) para evitar ataques de timing.
+</Warning>
+
+## Retentativas
+
+- Respostas `2xx` marcam a entrega como sucesso; qualquer outra resposta (ou timeout de 10s) agenda retentativa.
+- São feitas até **5 tentativas** com backoff: 1min, 5min, 15min, 1h, 3h.
+- Após **10 falhas consecutivas**, o endpoint é desativado automaticamente e precisa ser reativado no painel.
+
+<Tip>
+  Responda `2xx` imediatamente e processe o evento de forma assíncrona (fila).
+  Use o `X-Akeba-Delivery-Id` para descartar entregas duplicadas.
+</Tip>

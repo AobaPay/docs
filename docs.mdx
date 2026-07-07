@@ -1,0 +1,220 @@
+---
+title: "API Akeba para ERPs"
+description: "Integre seu ERP com a Akeba: consulte pedidos, atualize status de entrega, gerencie preços e estoque."
+icon: "plug"
+---
+
+## Visão geral
+
+A API REST da Akeba permite que vendedores integrem seus sistemas (ERPs, hubs de integração, automações próprias)
+para gerenciar a operação da loja de forma programática.
+
+<CardGroup cols={2}>
+  <Card title="Pedidos" icon="box">
+    Liste itens de pedido, consulte detalhes e atualize o status de entrega
+    (aceitar, iniciar produção, enviar com rastreio, voltar para produção).
+  </Card>
+  <Card title="Produtos" icon="tag">
+    Liste produtos com imagens, categoria e tags. Atualize preço base e
+    preço promocional.
+  </Card>
+  <Card title="Estoque" icon="warehouse">
+    Consulte e atualize quantidades por variação (SKU), com sincronização
+    automática do estoque global.
+  </Card>
+  <Card title="Webhooks" icon="bolt">
+    Receba notificações em tempo real de pedidos pagos, mudanças de status
+    e cancelamentos.
+  </Card>
+</CardGroup>
+
+**URL base:** `https://akeba.com.br/api/v1`
+
+Todas as respostas são em JSON (`Content-Type: application/json`). Todos os identificadores são UUIDs.
+
+---
+
+## Autenticação
+
+A API usa tokens Bearer. Gere seu token no painel do vendedor em **Integrações** (`/vendedor/integracoes`)
+e envie em todas as requisições:
+
+```bash
+curl https://akeba.com.br/api/v1/ping \
+  -H "Authorization: Bearer SEU_TOKEN"
+```
+
+Resposta:
+
+```json
+{ "pong": true, "loja_id": "9d3f2c1a-..." }
+```
+
+<Warning>
+  O token é exibido **uma única vez** ao ser gerado. Guarde-o em local seguro.
+  Tokens podem ser revogados a qualquer momento no painel de integrações.
+</Warning>
+
+<Note>
+  O token identifica a **loja**: todos os endpoints retornam e operam apenas
+  sobre dados da loja autenticada. Tentar acessar recursos de outra loja
+  retorna `404`.
+</Note>
+
+## Limite de requisições
+
+- **120 requisições por minuto** por loja.
+- Ao exceder o limite, a API retorna `429 Too Many Requests`.
+- Use os filtros de sincronização incremental (abaixo) para reduzir o volume de chamadas.
+
+## Paginação
+
+Endpoints de listagem são paginados (25 itens para pedidos e produtos, 50 para estoque)
+e seguem o padrão Laravel:
+
+```json
+{
+  "data": [ ... ],
+  "links": { "first": "...", "last": "...", "prev": null, "next": "..." },
+  "meta": { "current_page": 1, "last_page": 4, "per_page": 25, "total": 87 }
+}
+```
+
+Navegue com o parâmetro `?page=2` ou seguindo `links.next`.
+
+## Sincronização incremental (delta sync)
+
+Os endpoints `GET /pedidos`, `GET /produtos` e `GET /estoque` aceitam o parâmetro
+`atualizado_apos` (data/hora ISO 8601) para buscar **apenas o que mudou** desde a
+última sincronização:
+
+```bash
+curl "https://akeba.com.br/api/v1/produtos?atualizado_apos=2026-07-01T00:00:00Z" \
+  -H "Authorization: Bearer SEU_TOKEN"
+```
+
+Quando `atualizado_apos` está presente, os resultados são ordenados por
+`updated_at asc, id asc` — ordem estável, ideal para consumo incremental.
+
+<Steps>
+  <Step title="Primeira carga">
+    Liste tudo sem `atualizado_apos`, percorrendo todas as páginas.
+  </Step>
+  <Step title="Guarde o cursor">
+    Salve o maior `updated_at` recebido (ou o horário de início da sincronização).
+  </Step>
+  <Step title="Sincronizações seguintes">
+    Envie `atualizado_apos=<cursor salvo>` para receber apenas registros criados
+    ou alterados desde então.
+  </Step>
+</Steps>
+
+## Fluxo de um pedido
+
+Após o pagamento ser confirmado, cada item de pedido percorre o ciclo:
+
+```
+pending → accepted → in_production → shipped → delivered
+```
+
+| Ação | Endpoint | Transição |
+| --- | --- | --- |
+| Aceitar item | `POST /pedidos/{pedidoId}/itens/{itemId}/aceitar` | `pending → accepted` |
+| Iniciar produção | `POST /pedidos/{pedidoId}/itens/{itemId}/iniciar-producao` | `accepted → in_production` |
+| Enviar (com rastreio) | `POST /pedidos/{pedidoId}/itens/{itemId}/enviar` | `in_production → shipped` |
+| Voltar para produção | `POST /pedidos/{pedidoId}/itens/{itemId}/voltar-producao` | `shipped → in_production` |
+
+Transições inválidas retornam `422` com uma mensagem descritiva.
+
+## Webhooks
+
+Cadastre endpoints de webhook no painel de integrações para receber eventos em tempo real:
+
+| Evento | Disparado quando |
+| --- | --- |
+| `pedido.pago` | Um pedido com itens da sua loja é pago |
+| `item.status_alterado` | O status de um item de pedido muda |
+| `pedido.cancelado` | Um pedido é cancelado |
+
+Cada entrega inclui os headers:
+
+| Header | Descrição |
+| --- | --- |
+| `X-Akeba-Event` | Nome do evento (ex.: `pedido.pago`) |
+| `X-Akeba-Delivery-Id` | UUID único da entrega (use para deduplicação) |
+| `X-Akeba-Signature` | Assinatura HMAC do corpo: `sha256=HMAC-SHA256(corpo, segredo)` |
+
+### Validando a assinatura
+
+Sempre valide a assinatura antes de processar o payload:
+
+<CodeGroup>
+
+```php PHP
+$assinaturaEsperada = 'sha256='.hash_hmac('sha256', $corpoRaw, $segredo);
+
+if (! hash_equals($assinaturaEsperada, $request->header('X-Akeba-Signature'))) {
+    abort(401);
+}
+```
+
+```javascript Node.js
+const crypto = require("crypto");
+
+const esperada =
+  "sha256=" + crypto.createHmac("sha256", segredo).update(corpoRaw).digest("hex");
+
+const valida = crypto.timingSafeEqual(
+  Buffer.from(esperada),
+  Buffer.from(req.headers["x-akeba-signature"])
+);
+```
+
+```python Python
+import hashlib, hmac
+
+esperada = "sha256=" + hmac.new(
+    segredo.encode(), corpo_raw, hashlib.sha256
+).hexdigest()
+
+valida = hmac.compare_digest(esperada, request.headers["X-Akeba-Signature"])
+```
+
+</CodeGroup>
+
+### Retentativas
+
+- Respostas `2xx` marcam a entrega como sucesso; qualquer outra resposta (ou timeout de 10s) agenda retentativa.
+- São feitas até **5 tentativas** com backoff: 1min, 5min, 15min, 1h, 3h.
+- Após **10 falhas consecutivas**, o endpoint é desativado automaticamente e precisa ser reativado no painel.
+
+## Erros
+
+A API usa códigos HTTP convencionais:
+
+| Código | Significado |
+| --- | --- |
+| `200` | Sucesso |
+| `401` | Token ausente, inválido ou revogado |
+| `403` | Loja inativa ou suspensa |
+| `404` | Recurso não encontrado (ou pertence a outra loja) |
+| `422` | Erro de validação ou transição de status inválida |
+| `429` | Limite de requisições excedido |
+
+Erros de validação seguem o formato:
+
+```json
+{
+  "message": "O campo preco é obrigatório.",
+  "errors": {
+    "preco": ["O campo preco é obrigatório."]
+  }
+}
+```
+
+## Referência da API
+
+A referência completa de endpoints é gerada automaticamente a partir da
+especificação OpenAPI (`openapi.json`). Consulte a seção **API Reference**
+na barra lateral para ver parâmetros, corpos de requisição e exemplos de
+resposta de cada endpoint.

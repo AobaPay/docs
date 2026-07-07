@@ -1,0 +1,53 @@
+---
+title: "Erros"
+description: "Códigos de status HTTP e o formato das respostas de erro da API."
+icon: "triangle-exclamation"
+---
+
+A API usa códigos HTTP convencionais:
+
+| Código | Significado |
+| --- | --- |
+| `200` | Sucesso |
+| `401` | Token ausente, inválido ou revogado |
+| `403` | Loja inativa ou suspensa |
+| `404` | Recurso não encontrado (ou pertence a outra loja) |
+| `422` | Erro de validação ou transição de status inválida |
+| `429` | Limite de requisições excedido |
+
+## Formato dos erros de validação
+
+Erros de validação seguem o formato:
+
+```json
+{
+  "message": "O campo preco é obrigatório.",
+  "errors": {
+    "preco": ["O campo preco é obrigatório."]
+  }
+}
+```
+
+## Como tratar cada erro
+
+<AccordionGroup>
+  <Accordion title="401 — Não autenticado" icon="lock">
+    Verifique se o header `Authorization: Bearer SEU_TOKEN` está presente e se o
+    token não foi revogado. Gere um novo token no
+    [painel de integrações](https://akeba.com.br/vendedor/integracoes) se necessário.
+  </Accordion>
+  <Accordion title="404 — Não encontrado" icon="magnifying-glass">
+    O recurso não existe **ou pertence a outra loja**. Confirme se os UUIDs usados
+    foram obtidos com o mesmo token.
+  </Accordion>
+  <Accordion title="422 — Validação ou transição inválida" icon="circle-xmark">
+    Leia `message` e `errors` para saber qual campo falhou. Em ações de pedido,
+    confira se o item está no status esperado para a transição
+    (veja o [fluxo de pedidos](/guias/fluxo-de-pedidos)).
+  </Accordion>
+  <Accordion title="429 — Limite excedido" icon="gauge-high">
+    Aguarde antes de tentar novamente e implemente backoff exponencial. Reduza o
+    volume de chamadas com [delta sync](/guias/paginacao-e-sincronizacao) e
+    [webhooks](/guias/webhooks).
+  </Accordion>
+</AccordionGroup>

@@ -1,47 +1,76 @@
 ---
 title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+description: "Faça sua primeira chamada à API da Akeba em menos de 5 minutos."
+icon: "rocket"
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
+Este guia leva você do zero à primeira chamada autenticada: gerar um token,
+testar a conexão e listar seus pedidos.
 
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
+## Pré-requisitos
 
-## Prerequisites
+- Uma conta de **vendedor** ativa na [Akeba](https://www.akeba.com.br)
+- Uma ferramenta para fazer requisições HTTP (`curl`, Postman, Insomnia ou seu ERP)
 
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+## Comece agora
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+  <Step title="Gere seu token de API">
+    Acesse o painel do vendedor em [**Integrações**](https://akeba.com.br/vendedor/integracoes)
+    e clique em **Gerar token**.
+
+    <Warning>
+      O token é exibido **uma única vez** ao ser gerado. Guarde-o em local seguro.
+      Tokens podem ser revogados a qualquer momento no painel de integrações.
+    </Warning>
+  </Step>
+  <Step title="Teste a conexão">
+    Chame o endpoint `GET /ping` enviando o token no header `Authorization`:
 
     ```bash
-    npm install your-package
+    curl https://akeba.com.br/api/v1/ping \
+      -H "Authorization: Bearer SEU_TOKEN"
+    ```
+
+    Se tudo estiver certo, a resposta identifica a sua loja:
+
+    ```json
+    { "pong": true, "loja_id": "9d3f2c1a-..." }
     ```
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+  <Step title="Liste seus pedidos">
+    Busque os itens de pedido pendentes de aceite:
 
     ```bash
-    your-cli init
+    curl "https://akeba.com.br/api/v1/pedidos?status=pending" \
+      -H "Authorization: Bearer SEU_TOKEN"
     ```
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+  <Step title="Aceite um item">
+    Use os IDs retornados no passo anterior para aceitar um item e iniciar o
+    [fluxo de entrega](/guias/fluxo-de-pedidos):
 
     ```bash
-    your-cli start
+    curl -X POST \
+      "https://akeba.com.br/api/v1/pedidos/{pedidoId}/itens/{itemId}/aceitar" \
+      -H "Authorization: Bearer SEU_TOKEN"
     ```
   </Step>
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+## Próximos passos
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
-</Tip>
+<CardGroup cols={2}>
+  <Card title="Autenticação e limites" icon="key" href="/guias/autenticacao">
+    Entenda como o token funciona e os limites de requisição.
+  </Card>
+  <Card title="Fluxo de pedidos" icon="truck" href="/guias/fluxo-de-pedidos">
+    O ciclo completo de um item: do pagamento à entrega.
+  </Card>
+  <Card title="Webhooks" icon="bolt" href="/guias/webhooks">
+    Receba eventos em tempo real em vez de consultar a API repetidamente.
+  </Card>
+  <Card title="Erros" icon="triangle-exclamation" href="/guias/erros">
+    Códigos de status e como tratar cada tipo de erro.
+  </Card>
+</CardGroup>

@@ -1,0 +1,53 @@
+---
+title: "Autenticação"
+description: "Como autenticar suas requisições com token Bearer e respeitar os limites da API."
+icon: "key"
+---
+
+## Token Bearer
+
+A API usa tokens Bearer. Gere seu token no painel do vendedor em
+[**Integrações**](https://akeba.com.br/vendedor/integracoes) (`/vendedor/integracoes`)
+e envie em todas as requisições:
+
+```bash
+curl https://akeba.com.br/api/v1/ping \
+  -H "Authorization: Bearer SEU_TOKEN"
+```
+
+Resposta:
+
+```json
+{ "pong": true, "loja_id": "9d3f2c1a-..." }
+```
+
+<Warning>
+  O token é exibido **uma única vez** ao ser gerado. Guarde-o em local seguro.
+  Tokens podem ser revogados a qualquer momento no painel de integrações.
+</Warning>
+
+<Note>
+  O token identifica a **loja**: todos os endpoints retornam e operam apenas
+  sobre dados da loja autenticada. Tentar acessar recursos de outra loja
+  retorna `404`.
+</Note>
+
+## Limite de requisições
+
+- **120 requisições por minuto** por loja.
+- Ao exceder o limite, a API retorna `429 Too Many Requests`.
+- Use a [sincronização incremental](/guias/paginacao-e-sincronizacao#sincronizacao-incremental-delta-sync)
+  para reduzir o volume de chamadas.
+
+## Boas práticas
+
+<CardGroup cols={2}>
+  <Card title="Nunca exponha o token" icon="shield">
+    Armazene o token em variáveis de ambiente ou cofre de segredos —
+    nunca no código-fonte ou no front-end.
+  </Card>
+  <Card title="Revogue tokens comprometidos" icon="rotate">
+    Se um token vazar, revogue-o imediatamente no painel de integrações
+    e gere um novo.
+  </Card>
+</CardGroup>
