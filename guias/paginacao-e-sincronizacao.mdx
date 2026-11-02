@@ -46,6 +46,27 @@ Quando `atualizado_apos` está presente, os resultados são ordenados por
   </Step>
 </Steps>
 
+## Estoque por variação
+
+Um produto pode ter estoque separado para cada combinação de variações. Nesse caso,
+`GET /estoque` e o campo `estoques` do produto retornam uma linha por combinação:
+
+```json
+{
+  "id": "uuid-da-linha-de-estoque",
+  "sku": "CANECA-AZUL-P",
+  "variation_options": { "Cor": "Azul", "Tamanho": "P" },
+  "quantidade": 12,
+  "is_active": true
+}
+```
+
+Para atualizar uma combinação, envie `PATCH /estoque/{stockId}` com o `id` da linha.
+Use `variation_options` para relacionar a linha ao SKU do seu sistema.
+
+Produtos com variações mas sem linhas de estoque seguem o `estoque_global`.
+Itens sob encomenda e digitais não dão baixa no estoque.
+
 <Tip>
   Combine o delta sync com [webhooks](/guias/webhooks) para manter seu sistema
   atualizado em tempo real com o mínimo de chamadas à API.

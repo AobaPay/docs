@@ -544,7 +544,7 @@
     "/pedidos/{pedidoId}/itens/{itemId}/aceitar": {
       "post": {
         "operationId": "v1.pedidos.itens.aceitar",
-        "description": "Marca um item como aceito pela loja. Só é permitido quando o pedido está pago e o item está no status 'pendente'.\nTransição de status: pendente → aceito. Retorna o item atualizado ou erro 400 se a transição não for permitida.",
+        "description": "Marca um item como aceito pela loja. Só é permitido quando o pedido está pago e o item está no status 'pendente'.\nTransição de status: pendente → aceito. Retorna o item atualizado ou erro 403 se a ação não for permitida.\nItens digitais são entregues automaticamente e retornam erro 403 nesta ação.",
         "summary": "Aceita um item de pedido",
         "tags": [
           "Pedido"
@@ -602,7 +602,7 @@
     "/pedidos/{pedidoId}/itens/{itemId}/iniciar-producao": {
       "post": {
         "operationId": "v1.pedidos.itens.iniciarProducao",
-        "description": "Marca um item como em produção. Só é permitido quando o item está no status 'aceito'.\nTransição de status: aceito → em_producao. Retorna o item atualizado ou erro 400 se a transição não for permitida.",
+        "description": "Marca um item como em produção. Só é permitido quando o item está no status 'aceito'.\nTransição de status: aceito → em_producao. Retorna o item atualizado ou erro 403 se a ação não for permitida.\nItens digitais são entregues automaticamente e retornam erro 403 nesta ação.",
         "summary": "Inicia a produção de um item de pedido",
         "tags": [
           "Pedido"
@@ -660,7 +660,7 @@
     "/pedidos/{pedidoId}/itens/{itemId}/enviar": {
       "post": {
         "operationId": "v1.pedidos.itens.enviar",
-        "description": "Marca um item como enviado e registra o código de rastreamento. Só é permitido quando o item está no status 'em_producao'.\nRequer campo 'tracking_code' (string, até 100 caracteres). Transição de status: em_producao → enviado.\nRetorna o item atualizado ou erro 400 se a transição não for permitida.",
+        "description": "Marca um item como enviado e registra o código de rastreamento. Só é permitido quando o item está no status 'em_producao'.\nRequer campo 'tracking_code' (string, até 100 caracteres). Transição de status: em_producao → enviado.\nRetorna o item atualizado ou erro 403 se a ação não for permitida.\nItens digitais são entregues automaticamente e retornam erro 403 nesta ação.",
         "summary": "Marca um item como enviado com código de rastreio",
         "tags": [
           "Pedido"
@@ -730,7 +730,7 @@
     "/pedidos/{pedidoId}/itens/{itemId}/voltar-producao": {
       "post": {
         "operationId": "v1.pedidos.itens.voltarProducao",
-        "description": "Reverte um item enviado de volta para o status de produção (e.g., em caso de erro de envio).\nSó é permitido quando o item está no status 'enviado'.\nTransição de status: enviado → em_producao. Retorna o item atualizado ou erro 400 se a transição não for permitida.",
+        "description": "Reverte um item enviado de volta para o status de produção (e.g., em caso de erro de envio).\nSó é permitido quando o item está no status 'enviado'.\nTransição de status: enviado → em_producao. Retorna o item atualizado ou erro 403 se a ação não for permitida.",
         "summary": "Volta um item para produção",
         "tags": [
           "Pedido"
@@ -1135,13 +1135,19 @@
             "type": "string"
           },
           "variation_options": {
-            "type": "string"
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "string"
+            }
           },
           "quantidade": {
-            "type": "string"
+            "type": "integer"
           },
           "is_active": {
-            "type": "string"
+            "type": "boolean"
           },
           "produto": {
             "type": "object",
@@ -1192,7 +1198,7 @@
             "type": "string"
           },
           "quantidade": {
-            "type": "string"
+            "type": "integer"
           },
           "subtotal": {
             "type": "string"
@@ -1210,7 +1216,13 @@
             "type": "string"
           },
           "variation_options": {
-            "type": "string"
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "string"
+            }
           },
           "personalization_data": {
             "type": "string"
@@ -1501,10 +1513,13 @@
             "type": "string"
           },
           "estoque_global": {
-            "type": "string"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "has_variations": {
-            "type": "string"
+            "type": "boolean"
           },
           "capa": {
             "type": [
@@ -1608,7 +1623,7 @@
             "type": "string"
           },
           "track_stock": {
-            "type": "string"
+            "type": "boolean"
           },
           "plano": {
             "type": "string"

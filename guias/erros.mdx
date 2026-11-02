@@ -10,9 +10,9 @@ A API usa códigos HTTP convencionais:
 | --- | --- |
 | `200` | Sucesso |
 | `401` | Token ausente, inválido ou revogado |
-| `403` | Loja inativa ou suspensa |
+| `403` | Conta do lojista desativada, loja inativa ou suspensa, ou ação de pedido não permitida |
 | `404` | Recurso não encontrado (ou pertence a outra loja) |
-| `422` | Erro de validação ou transição de status inválida |
+| `422` | Erro de validação |
 | `429` | Limite de requisições excedido |
 
 ## Formato dos erros de validação
@@ -36,14 +36,20 @@ Erros de validação seguem o formato:
     token não foi revogado. Gere um novo token no
     [painel de integrações](https://akeba.com.br/vendedor/integracoes) se necessário.
   </Accordion>
+  <Accordion title="403 — Ação não permitida" icon="ban">
+    Leia `message` para saber o motivo. A resposta indica uma conta de lojista
+    desativada, uma loja inativa ou suspensa, ou uma ação de pedido não permitida,
+    como aceitar um item de um pedido que não está pago. Itens digitais também
+    retornam `403` nas ações de pedido (veja o
+    [fluxo de pedidos](/guias/fluxo-de-pedidos#itens-digitais)).
+  </Accordion>
   <Accordion title="404 — Não encontrado" icon="magnifying-glass">
     O recurso não existe **ou pertence a outra loja**. Confirme se os UUIDs usados
     foram obtidos com o mesmo token.
   </Accordion>
-  <Accordion title="422 — Validação ou transição inválida" icon="circle-xmark">
-    Leia `message` e `errors` para saber qual campo falhou. Em ações de pedido,
-    confira se o item está no status esperado para a transição
-    (veja o [fluxo de pedidos](/guias/fluxo-de-pedidos)).
+  <Accordion title="422 — Erro de validação" icon="circle-xmark">
+    Leia `message` e `errors` para saber qual campo falhou e corrija o corpo da
+    requisição antes de tentar novamente.
   </Accordion>
   <Accordion title="429 — Limite excedido" icon="gauge-high">
     Aguarde antes de tentar novamente e implemente backoff exponencial. Reduza o

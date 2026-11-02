@@ -4,9 +4,9 @@
   "name": "Akeba",
   "description": "Documentação da API da Akeba — marketplace de produtos criativos e artesanais feitos por criadores independentes do Brasil.",
   "colors": {
-    "primary": "#F57754",
-    "light": "#F89B82",
-    "dark": "#D95F3D"
+    "primary": "#61005D",
+    "light": "#C6B1FF",
+    "dark": "#480246"
   },
   "appearance": {
     "default": "light",
@@ -14,7 +14,7 @@
   },
   "background": {
     "color": {
-      "light": "#FCF8ED"
+      "light": "#FFFFFF"
     }
   },
   "fonts": {
@@ -22,7 +22,7 @@
       "family": "Bricolage Grotesque"
     },
     "body": {
-      "family": "Montserrat"
+      "family": "Bricolage Grotesque"
     }
   },
   "favicon": "/favicon.svg",

@@ -19,7 +19,32 @@ pending → accepted → in_production → shipped → delivered
 | Enviar (com rastreio) | `POST /pedidos/{pedidoId}/itens/{itemId}/enviar` | `in_production → shipped` |
 | Voltar para produção | `POST /pedidos/{pedidoId}/itens/{itemId}/voltar-producao` | `shipped → in_production` |
 
-Transições inválidas retornam `422` com uma mensagem descritiva.
+Cada ação só funciona a partir do status indicado na tabela. Fora dele, a API retorna
+`403` com o motivo em `message` e o item não muda.
+
+<Note>
+  Quando a SuperFrete informa a postagem de uma etiqueta, os itens da loja no pedido
+  podem ir para `shipped` sem passar pelas etapas anteriores.
+</Note>
+
+## Entrega
+
+A API não tem uma ação para marcar um item como `delivered`. O item muda para esse
+status quando o comprador confirma o recebimento ou quando a SuperFrete informa a
+entrega.
+
+<Tip>
+  Assine o webhook `item.status_alterado` para saber quando um item muda de status
+  fora do seu sistema. Veja o [guia de webhooks](/guias/webhooks).
+</Tip>
+
+## Itens digitais
+
+Itens digitais são entregues automaticamente após a aprovação do pagamento e vão
+direto para `delivered`.
+
+Por isso, `aceitar`, `iniciar-producao` e `enviar` retornam `403` para esses itens.
+Identifique-os pelo campo `delivery_type` igual a `digital` antes de chamar essas ações.
 
 ## Exemplo completo
 
